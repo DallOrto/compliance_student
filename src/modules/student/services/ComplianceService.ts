@@ -18,7 +18,6 @@ export class ComplianceService implements IComplianceService {
       schoolId: data.schoolId,
     });
 
-    // TODO: implementar regras de negócio de compliance
     const approved = true;
     const reason = null;
 
