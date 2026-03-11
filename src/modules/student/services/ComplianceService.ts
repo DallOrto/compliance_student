@@ -18,8 +18,8 @@ export class ComplianceService implements IComplianceService {
       schoolId: data.schoolId,
     });
 
-    const approved = true;
-    const reason = null;
+    const approved = Math.random() < 1 / 3;
+    const reason = approved ? null : (['A', 'B', 'C'] as const)[Math.floor(Math.random() * 3)];
 
     const complianceCheck = await this.complianceRepository.create({
       studentId: student.id,

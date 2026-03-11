@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import studentRoutes from './modules/student/routes/student.routes';
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -13,6 +13,8 @@ app.get('/', (req, res) => {
   res.json({ message: 'compliance_student API running!' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
