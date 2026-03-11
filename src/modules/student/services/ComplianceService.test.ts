@@ -2,6 +2,10 @@ import { ComplianceService } from './ComplianceService';
 import { IStudentRepository } from '../interfaces/IStudentRepository';
 import { IComplianceRepository } from '../interfaces/IComplianceRepository';
 
+jest.mock('bcrypt', () => ({
+  hash: jest.fn().mockResolvedValue('hashed-password'),
+}));
+
 const mockStudentRepository: IStudentRepository = {
   upsert: jest.fn(),
 };
@@ -70,7 +74,7 @@ describe('ComplianceService', () => {
       expect(mockStudentRepository.upsert).toHaveBeenCalledWith({
         name: 'João Silva',
         document: '12345678900',
-        password: '123456',
+        password: 'hashed-password',
         birthDate: new Date('2000-01-01'),
         schoolId: 'school-1',
       });

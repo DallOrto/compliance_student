@@ -1,4 +1,5 @@
 import request from 'supertest';
+import bcrypt from 'bcrypt';
 import { app } from '../../../server';
 import prisma from '../../../lib/prisma';
 
@@ -11,6 +12,26 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
+async function getToken(): Promise<string> {
+  const hashedPassword = await bcrypt.hash('senha123', 10);
+
+  await prisma.student.create({
+    data: {
+      name: 'Maria Souza',
+      document: '98765432100',
+      password: hashedPassword,
+      birthDate: new Date('2001-05-15'),
+      schoolId: 'escola-abc',
+    },
+  });
+
+  const loginResponse = await request(app)
+    .post('/auth/login')
+    .send({ document: '98765432100', password: 'senha123' });
+
+  return loginResponse.body.token;
+}
+
 describe('POST /students/compliance', () => {
   const payload = {
     name: 'Maria Souza',
@@ -20,9 +41,27 @@ describe('POST /students/compliance', () => {
     schoolId: 'escola-abc',
   };
 
-  it('deve retornar 200 com os dados do aluno', async () => {
+  it('deve retornar 401 quando token não for fornecido', async () => {
+    await request(app)
+      .post('/students/compliance')
+      .send(payload)
+      .expect(401);
+  });
+
+  it('deve retornar 401 quando token for inválido', async () => {
+    await request(app)
+      .post('/students/compliance')
+      .set('Authorization', 'Bearer token-invalido')
+      .send(payload)
+      .expect(401);
+  });
+
+  it('deve retornar 200 com os dados do aluno quando autenticado', async () => {
+    const token = await getToken();
+
     const response = await request(app)
       .post('/students/compliance')
+      .set('Authorization', `Bearer ${token}`)
       .send(payload)
       .expect(200);
 
@@ -33,8 +72,11 @@ describe('POST /students/compliance', () => {
   });
 
   it('deve retornar approved como boolean e reason válido', async () => {
+    const token = await getToken();
+
     const response = await request(app)
       .post('/students/compliance')
+      .set('Authorization', `Bearer ${token}`)
       .send(payload)
       .expect(200);
 
@@ -47,33 +89,33 @@ describe('POST /students/compliance', () => {
     }
   });
 
-  it('deve persistir o aluno no banco de dados', async () => {
-    await request(app).post('/students/compliance').send(payload).expect(200);
-
-    const student = await prisma.student.findUnique({
-      where: { document: '98765432100' },
-    });
-
-    expect(student).not.toBeNull();
-    expect(student?.name).toBe('Maria Souza');
-    expect(student?.schoolId).toBe('escola-abc');
-  });
-
   it('deve persistir o registro de compliance no banco de dados', async () => {
-    await request(app).post('/students/compliance').send(payload).expect(200);
+    const token = await getToken();
+
+    await request(app)
+      .post('/students/compliance')
+      .set('Authorization', `Bearer ${token}`)
+      .send(payload)
+      .expect(200);
 
     const compliances = await prisma.complianceCheck.findMany();
-
     expect(compliances).toHaveLength(1);
     expect(typeof compliances[0].approved).toBe('boolean');
   });
 
   it('deve atualizar o aluno e criar novo compliance ao receber o mesmo document', async () => {
-    await request(app).post('/students/compliance').send(payload).expect(200);
+    const token = await getToken();
+
+    await request(app)
+      .post('/students/compliance')
+      .set('Authorization', `Bearer ${token}`)
+      .send(payload)
+      .expect(200);
 
     const updatedPayload = { ...payload, name: 'Maria Souza Atualizada' };
     const response = await request(app)
       .post('/students/compliance')
+      .set('Authorization', `Bearer ${token}`)
       .send(updatedPayload)
       .expect(200);
 

@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import { IComplianceService } from '../interfaces/IComplianceService';
 import { IStudentRepository } from '../interfaces/IStudentRepository';
 import { IComplianceRepository } from '../interfaces/IComplianceRepository';
@@ -10,10 +11,12 @@ export class ComplianceService implements IComplianceService {
   ) {}
 
   async check(data: CheckComplianceDTO): Promise<ComplianceResultDTO> {
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
     const student = await this.studentRepository.upsert({
       name: data.name,
       document: data.document,
-      password: data.password,
+      password: hashedPassword,
       birthDate: new Date(data.birthDate),
       schoolId: data.schoolId,
     });

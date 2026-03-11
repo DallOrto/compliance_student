@@ -8,4 +8,10 @@ module.exports = {
   },
   testMatch: ['**/*.test.ts'],
   testPathIgnorePatterns: ['\\.integration\\.test\\.ts$'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.test.ts',
+    '!src/**/*.d.ts',
+    '!src/test/**',
+  ],
 };
