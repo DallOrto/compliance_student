@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
-    "build": "npx prisma generate && tsc && npx tsx prisma/seed.ts",
+    "build": "npx prisma generate && tsc",
     "seed": "tsx prisma/seed.ts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
