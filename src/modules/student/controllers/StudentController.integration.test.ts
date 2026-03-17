@@ -2,6 +2,9 @@ import request from 'supertest';
 import { app } from '../../../server';
 import prisma from '../../../lib/prisma';
 
+const API_KEY = 'test-api-key';
+process.env.INTERNAL_API_KEY = API_KEY;
+
 beforeEach(async () => {
   await prisma.complianceCheck.deleteMany();
   await prisma.student.deleteMany();
@@ -20,9 +23,25 @@ describe('POST /students/compliance', () => {
     schoolId: 'escola-abc',
   };
 
+  it('deve retornar 401 quando api key não for fornecida', async () => {
+    await request(app)
+      .post('/students/compliance')
+      .send(payload)
+      .expect(401);
+  });
+
+  it('deve retornar 401 quando api key for inválida', async () => {
+    await request(app)
+      .post('/students/compliance')
+      .set('x-api-key', 'chave-errada')
+      .send(payload)
+      .expect(401);
+  });
+
   it('deve retornar 200 com os dados do aluno', async () => {
     const response = await request(app)
       .post('/students/compliance')
+      .set('x-api-key', API_KEY)
       .send(payload)
       .expect(200);
 
@@ -35,6 +54,7 @@ describe('POST /students/compliance', () => {
   it('deve retornar approved como boolean e reason válido', async () => {
     const response = await request(app)
       .post('/students/compliance')
+      .set('x-api-key', API_KEY)
       .send(payload)
       .expect(200);
 
@@ -50,6 +70,7 @@ describe('POST /students/compliance', () => {
   it('deve persistir o registro de compliance no banco de dados', async () => {
     await request(app)
       .post('/students/compliance')
+      .set('x-api-key', API_KEY)
       .send(payload)
       .expect(200);
 
@@ -61,12 +82,14 @@ describe('POST /students/compliance', () => {
   it('deve atualizar o aluno e criar novo compliance ao receber o mesmo document', async () => {
     await request(app)
       .post('/students/compliance')
+      .set('x-api-key', API_KEY)
       .send(payload)
       .expect(200);
 
     const updatedPayload = { ...payload, name: 'Maria Souza Atualizada' };
     const response = await request(app)
       .post('/students/compliance')
+      .set('x-api-key', API_KEY)
       .send(updatedPayload)
       .expect(200);
 
