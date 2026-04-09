@@ -9,7 +9,6 @@ export class StudentRepository implements IStudentRepository {
       where: { document: data.document },
       update: {
         name: data.name,
-        password: data.password,
         birthDate: data.birthDate,
         schoolId: data.schoolId,
       },

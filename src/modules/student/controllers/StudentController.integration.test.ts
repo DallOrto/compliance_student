@@ -58,6 +58,8 @@ describe('POST /students/compliance', () => {
       .send(payload)
       .expect(200);
 
+    expect(typeof response.body.complianceId).toBe('string');
+    expect(response.body.complianceId).toBeDefined();
     expect(typeof response.body.approved).toBe('boolean');
 
     if (response.body.approved) {

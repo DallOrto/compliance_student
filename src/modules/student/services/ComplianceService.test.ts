@@ -2,10 +2,6 @@ import { ComplianceService } from './ComplianceService';
 import { IStudentRepository } from '../interfaces/IStudentRepository';
 import { IComplianceRepository } from '../interfaces/IComplianceRepository';
 
-jest.mock('bcrypt', () => ({
-  hash: jest.fn().mockResolvedValue('hashed-password'),
-}));
-
 const mockStudentRepository: IStudentRepository = {
   upsert: jest.fn(),
 };
@@ -18,11 +14,17 @@ const fakeStudent = {
   id: 'uuid-123',
   name: 'João Silva',
   document: '12345678900',
-  password: 'hashed',
   birthDate: new Date('2000-01-01'),
   schoolId: 'school-1',
   createdAt: new Date(),
   updatedAt: new Date(),
+};
+
+const baseInput = {
+  name: 'João Silva',
+  document: '12345678900',
+  birthDate: '2000-01-01',
+  schoolId: 'school-1',
 };
 
 describe('ComplianceService', () => {
@@ -42,14 +44,9 @@ describe('ComplianceService', () => {
         id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
       });
 
-      const result = await service.check({
-        name: 'João Silva',
-        document: '12345678900',
-        password: '123456',
-        birthDate: '2000-01-01',
-        schoolId: 'school-1',
-      });
+      const result = await service.check(baseInput);
 
+      expect(result.complianceId).toBe('uuid-456');
       expect(result.student.id).toBe('uuid-123');
       expect(result.student.name).toBe('João Silva');
       expect(result.student.document).toBe('12345678900');
@@ -63,18 +60,11 @@ describe('ComplianceService', () => {
         id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
       });
 
-      await service.check({
-        name: 'João Silva',
-        document: '12345678900',
-        password: '123456',
-        birthDate: '2000-01-01',
-        schoolId: 'school-1',
-      });
+      await service.check(baseInput);
 
       expect(mockStudentRepository.upsert).toHaveBeenCalledWith({
         name: 'João Silva',
         document: '12345678900',
-        password: 'hashed-password',
         birthDate: new Date('2000-01-01'),
         schoolId: 'school-1',
       });
@@ -87,13 +77,7 @@ describe('ComplianceService', () => {
         id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
       });
 
-      await service.check({
-        name: 'João Silva',
-        document: '12345678900',
-        password: '123456',
-        birthDate: '2000-01-01',
-        schoolId: 'school-1',
-      });
+      await service.check(baseInput);
 
       expect(mockComplianceRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ studentId: 'uuid-123' }),
@@ -107,13 +91,7 @@ describe('ComplianceService', () => {
         id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
       });
 
-      await service.check({
-        name: 'João Silva',
-        document: '12345678900',
-        password: '123456',
-        birthDate: '2000-01-01',
-        schoolId: 'school-1',
-      });
+      await service.check(baseInput);
 
       expect(mockStudentRepository.upsert).toHaveBeenCalledTimes(1);
       expect(mockComplianceRepository.create).toHaveBeenCalledTimes(1);
@@ -127,9 +105,7 @@ describe('ComplianceService', () => {
           id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
         });
 
-        await service.check({
-          name: 'João Silva', document: '12345678900', password: '123456', birthDate: '2000-01-01', schoolId: 'school-1',
-        });
+        await service.check(baseInput);
 
         expect(mockComplianceRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({ approved: true, reason: null }),
@@ -145,9 +121,7 @@ describe('ComplianceService', () => {
           id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'A', createdAt: new Date(),
         });
 
-        await service.check({
-          name: 'João Silva', document: '12345678900', password: '123456', birthDate: '2000-01-01', schoolId: 'school-1',
-        });
+        await service.check(baseInput);
 
         expect(mockComplianceRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({ approved: false }),
@@ -161,16 +135,12 @@ describe('ComplianceService', () => {
       });
 
       it('deve definir motivo "A" quando sorteio cai no índice 0', async () => {
-        jest.spyOn(Math, 'random')
-          .mockReturnValueOnce(0.5)
-          .mockReturnValueOnce(0.0);
+        jest.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.0);
         (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
           id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'A', createdAt: new Date(),
         });
 
-        await service.check({
-          name: 'João Silva', document: '12345678900', password: '123456', birthDate: '2000-01-01', schoolId: 'school-1',
-        });
+        await service.check(baseInput);
 
         expect(mockComplianceRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({ approved: false, reason: 'A' }),
@@ -178,16 +148,12 @@ describe('ComplianceService', () => {
       });
 
       it('deve definir motivo "B" quando sorteio cai no índice 1', async () => {
-        jest.spyOn(Math, 'random')
-          .mockReturnValueOnce(0.5)
-          .mockReturnValueOnce(0.34);
+        jest.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.34);
         (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
           id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'B', createdAt: new Date(),
         });
 
-        await service.check({
-          name: 'João Silva', document: '12345678900', password: '123456', birthDate: '2000-01-01', schoolId: 'school-1',
-        });
+        await service.check(baseInput);
 
         expect(mockComplianceRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({ approved: false, reason: 'B' }),
@@ -195,16 +161,12 @@ describe('ComplianceService', () => {
       });
 
       it('deve definir motivo "C" quando sorteio cai no índice 2', async () => {
-        jest.spyOn(Math, 'random')
-          .mockReturnValueOnce(0.5)
-          .mockReturnValueOnce(0.67);
+        jest.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.67);
         (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
           id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'C', createdAt: new Date(),
         });
 
-        await service.check({
-          name: 'João Silva', document: '12345678900', password: '123456', birthDate: '2000-01-01', schoolId: 'school-1',
-        });
+        await service.check(baseInput);
 
         expect(mockComplianceRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({ approved: false, reason: 'C' }),
@@ -217,9 +179,7 @@ describe('ComplianceService', () => {
           id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
         });
 
-        await service.check({
-          name: 'João Silva', document: '12345678900', password: '123456', birthDate: '2000-01-01', schoolId: 'school-1',
-        });
+        await service.check(baseInput);
 
         expect(mockComplianceRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({ approved: true, reason: null }),
