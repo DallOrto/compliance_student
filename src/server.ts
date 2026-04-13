@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import studentRoutes from './modules/student/routes/student.routes';
 import { setupSwagger } from './swagger';
+import { startComplianceWorker } from './workers/complianceWorker';
 
 export const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,5 +20,6 @@ app.get('/', (req, res) => {
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    startComplianceWorker();
   });
 }

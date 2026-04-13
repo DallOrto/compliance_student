@@ -1,13 +1,15 @@
 import { ComplianceService } from './ComplianceService';
 import { IStudentRepository } from '../interfaces/IStudentRepository';
-import { IComplianceRepository } from '../interfaces/IComplianceRepository';
+import { IComplianceJobRepository } from '../interfaces/IComplianceJobRepository';
 
 const mockStudentRepository: IStudentRepository = {
   upsert: jest.fn(),
 };
 
-const mockComplianceRepository: IComplianceRepository = {
+const mockComplianceJobRepository: IComplianceJobRepository = {
   create: jest.fn(),
+  findPendingOlderThan: jest.fn(),
+  markDone: jest.fn(),
 };
 
 const fakeStudent = {
@@ -20,11 +22,21 @@ const fakeStudent = {
   updatedAt: new Date(),
 };
 
+const fakeJob = {
+  id: 'job-uuid-456',
+  studentId: 'uuid-123',
+  callbackUrl: 'http://api1/internal/compliance-result/attempt-1',
+  status: 'PROCESSING' as const,
+  createdAt: new Date(),
+  processedAt: null,
+};
+
 const baseInput = {
   name: 'João Silva',
   document: '12345678900',
   birthDate: '2000-01-01',
   schoolId: 'school-1',
+  callbackUrl: 'http://api1/internal/compliance-result/attempt-1',
 };
 
 describe('ComplianceService', () => {
@@ -32,34 +44,22 @@ describe('ComplianceService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.restoreAllMocks();
-    service = new ComplianceService(mockStudentRepository, mockComplianceRepository);
+    (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
+    (mockComplianceJobRepository.create as jest.Mock).mockResolvedValue(fakeJob);
+    service = new ComplianceService(mockStudentRepository, mockComplianceJobRepository);
   });
 
   describe('check()', () => {
-    it('deve retornar os dados do aluno no resultado', async () => {
-      jest.spyOn(Math, 'random').mockReturnValue(0.1);
-      (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
-      (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-        id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
-      });
-
+    it('deve retornar jobId e status PROCESSING', async () => {
       const result = await service.check(baseInput);
 
-      expect(result.complianceId).toBe('uuid-456');
-      expect(result.student.id).toBe('uuid-123');
-      expect(result.student.name).toBe('João Silva');
-      expect(result.student.document).toBe('12345678900');
-      expect(result.student.schoolId).toBe('school-1');
+      expect(result).toEqual({
+        jobId: 'job-uuid-456',
+        status: 'PROCESSING',
+      });
     });
 
-    it('deve converter birthDate string para Date ao chamar upsert', async () => {
-      jest.spyOn(Math, 'random').mockReturnValue(0.1);
-      (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
-      (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-        id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
-      });
-
+    it('deve fazer upsert do aluno com os dados corretos', async () => {
       await service.check(baseInput);
 
       expect(mockStudentRepository.upsert).toHaveBeenCalledWith({
@@ -70,122 +70,30 @@ describe('ComplianceService', () => {
       });
     });
 
-    it('deve criar o compliance com o studentId retornado pelo upsert', async () => {
-      jest.spyOn(Math, 'random').mockReturnValue(0.1);
-      (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
-      (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-        id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
-      });
-
+    it('deve criar o job com o studentId retornado pelo upsert e a callbackUrl', async () => {
       await service.check(baseInput);
 
-      expect(mockComplianceRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ studentId: 'uuid-123' }),
-      );
+      expect(mockComplianceJobRepository.create).toHaveBeenCalledWith({
+        studentId: 'uuid-123',
+        callbackUrl: 'http://api1/internal/compliance-result/attempt-1',
+      });
     });
 
-    it('deve chamar upsert e create exatamente uma vez por check', async () => {
-      jest.spyOn(Math, 'random').mockReturnValue(0.1);
-      (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
-      (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-        id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
-      });
-
+    it('deve chamar upsert e create exatamente uma vez', async () => {
       await service.check(baseInput);
 
       expect(mockStudentRepository.upsert).toHaveBeenCalledTimes(1);
-      expect(mockComplianceRepository.create).toHaveBeenCalledTimes(1);
+      expect(mockComplianceJobRepository.create).toHaveBeenCalledTimes(1);
     });
 
-    describe('regra de aprovação (33% de chance)', () => {
-      it('deve aprovar quando Math.random() < 1/3', async () => {
-        jest.spyOn(Math, 'random').mockReturnValue(0.1);
-        (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
-        (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-          id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
-        });
+    it('não deve executar lógica de aprovação/reprovação (responsabilidade do worker)', async () => {
+      // O ComplianceService apenas registra o job e retorna imediatamente.
+      // Não há Math.random aqui — isso foi movido para o complianceWorker.
+      const randomSpy = jest.spyOn(Math, 'random');
 
-        await service.check(baseInput);
+      await service.check(baseInput);
 
-        expect(mockComplianceRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({ approved: true, reason: null }),
-        );
-      });
-
-      it('deve reprovar quando Math.random() >= 1/3', async () => {
-        jest.spyOn(Math, 'random')
-          .mockReturnValueOnce(0.5)
-          .mockReturnValueOnce(0);
-        (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
-        (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-          id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'A', createdAt: new Date(),
-        });
-
-        await service.check(baseInput);
-
-        expect(mockComplianceRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({ approved: false }),
-        );
-      });
-    });
-
-    describe('motivo de recusa', () => {
-      beforeEach(() => {
-        (mockStudentRepository.upsert as jest.Mock).mockResolvedValue(fakeStudent);
-      });
-
-      it('deve definir motivo "A" quando sorteio cai no índice 0', async () => {
-        jest.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.0);
-        (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-          id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'A', createdAt: new Date(),
-        });
-
-        await service.check(baseInput);
-
-        expect(mockComplianceRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({ approved: false, reason: 'A' }),
-        );
-      });
-
-      it('deve definir motivo "B" quando sorteio cai no índice 1', async () => {
-        jest.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.34);
-        (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-          id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'B', createdAt: new Date(),
-        });
-
-        await service.check(baseInput);
-
-        expect(mockComplianceRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({ approved: false, reason: 'B' }),
-        );
-      });
-
-      it('deve definir motivo "C" quando sorteio cai no índice 2', async () => {
-        jest.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.67);
-        (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-          id: 'uuid-456', studentId: 'uuid-123', approved: false, reason: 'C', createdAt: new Date(),
-        });
-
-        await service.check(baseInput);
-
-        expect(mockComplianceRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({ approved: false, reason: 'C' }),
-        );
-      });
-
-      it('não deve definir motivo quando aprovado', async () => {
-        jest.spyOn(Math, 'random').mockReturnValue(0.1);
-        (mockComplianceRepository.create as jest.Mock).mockResolvedValue({
-          id: 'uuid-456', studentId: 'uuid-123', approved: true, reason: null, createdAt: new Date(),
-        });
-
-        await service.check(baseInput);
-
-        expect(mockComplianceRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({ approved: true, reason: null }),
-        );
-        expect(Math.random).toHaveBeenCalledTimes(1);
-      });
+      expect(randomSpy).not.toHaveBeenCalled();
     });
   });
 });

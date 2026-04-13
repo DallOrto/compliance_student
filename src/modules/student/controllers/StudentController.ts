@@ -8,6 +8,6 @@ export class StudentController {
   checkCompliance = async (req: Request, res: Response): Promise<void> => {
     const body = req.body as CheckComplianceDTO;
     const result = await this.complianceService.check(body);
-    res.status(200).json(result);
+    res.status(202).json(result);
   };
 }

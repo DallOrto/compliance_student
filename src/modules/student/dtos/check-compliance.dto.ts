@@ -3,6 +3,7 @@ export interface CheckComplianceDTO {
   document: string;
   birthDate: string;
   schoolId: string;
+  callbackUrl: string;
 }
 
 export interface ComplianceResultDTO {
@@ -15,4 +16,9 @@ export interface ComplianceResultDTO {
     document: string;
     schoolId: string;
   };
+}
+
+export interface ComplianceJobCreatedDTO {
+  jobId: string;
+  status: 'PROCESSING';
 }

@@ -7,6 +7,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ComplianceJobStatus {
+  PROCESSING
+  DONE
+}
+
 model Student {
   id        String   @id @default(uuid())
   name      String
@@ -18,6 +23,7 @@ model Student {
   updatedAt DateTime @updatedAt
 
   complianceChecks ComplianceCheck[]
+  complianceJobs   ComplianceJob[]
 }
 
 model ComplianceCheck {
@@ -29,4 +35,17 @@ model ComplianceCheck {
   createdAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id])
+}
+
+model ComplianceJob {
+  id          String              @id @default(uuid())
+  studentId   String
+  callbackUrl String
+  status      ComplianceJobStatus @default(PROCESSING)
+  createdAt   DateTime            @default(now())
+  processedAt DateTime?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@map("compliance_jobs")
 }
