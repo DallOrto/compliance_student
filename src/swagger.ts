@@ -10,52 +10,42 @@ const swaggerDocument = {
   },
   components: {
     securitySchemes: {
-      bearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
+      apiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-api-key',
       },
     },
     schemas: {
-      LoginRequest: {
-        type: 'object',
-        required: ['document', 'password'],
-        properties: {
-          document: { type: 'string', example: '12345678900' },
-          password: { type: 'string', example: 'senha123' },
-        },
-      },
-      LoginResponse: {
-        type: 'object',
-        properties: {
-          token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
-        },
-      },
       CheckComplianceRequest: {
         type: 'object',
-        required: ['name', 'document', 'password', 'birthDate', 'schoolId'],
+        required: ['name', 'document', 'birthDate', 'schoolId', 'callbackUrl'],
         properties: {
           name: { type: 'string', example: 'João da Silva' },
           document: { type: 'string', example: '12345678900' },
-          password: { type: 'string', example: 'senha123' },
           birthDate: { type: 'string', format: 'date', example: '1995-03-16' },
           schoolId: { type: 'string', example: 'school-uuid-aqui' },
+          callbackUrl: { type: 'string', format: 'uri', example: 'http://api1/internal/compliance-result/attempt-id' },
         },
       },
       CheckComplianceResponse: {
         type: 'object',
+        description: 'Solicitação aceita — processamento iniciado. O resultado será enviado via webhook para a callbackUrl.',
         properties: {
-          approved: { type: 'boolean', example: true },
-          reason: { type: 'string', nullable: true, enum: ['A', 'B', 'C', null], example: null },
-          student: {
-            type: 'object',
-            properties: {
-              id: { type: 'string', format: 'uuid', example: 'a1b2c3d4-...' },
-              name: { type: 'string', example: 'João da Silva' },
-              document: { type: 'string', example: '12345678900' },
-              schoolId: { type: 'string', example: 'school-uuid-aqui' },
-            },
-          },
+          jobId: { type: 'string', format: 'uuid', example: 'a1b2c3d4-...' },
+          status: { type: 'string', enum: ['PROCESSING'], example: 'PROCESSING' },
+        },
+      },
+      ComplianceCallbackPayload: {
+        type: 'object',
+        description: 'Payload enviado via webhook para a callbackUrl quando o job é processado.',
+        required: ['jobId', 'complianceId', 'approved', 'complianceStudentId'],
+        properties: {
+          jobId: { type: 'string', format: 'uuid' },
+          complianceId: { type: 'string', format: 'uuid' },
+          approved: { type: 'boolean' },
+          reason: { type: 'string', nullable: true },
+          complianceStudentId: { type: 'string', format: 'uuid' },
         },
       },
       ErrorResponse: {
@@ -67,43 +57,12 @@ const swaggerDocument = {
     },
   },
   paths: {
-    '/auth/login': {
-      post: {
-        tags: ['Auth'],
-        summary: 'Autenticar estudante',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/LoginRequest' },
-            },
-          },
-        },
-        responses: {
-          '200': {
-            description: 'Login realizado com sucesso',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/LoginResponse' },
-              },
-            },
-          },
-          '401': {
-            description: 'Credenciais inválidas',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' },
-              },
-            },
-          },
-        },
-      },
-    },
     '/students/compliance': {
       post: {
         tags: ['Students'],
-        summary: 'Verificar compliance do estudante',
-        security: [{ bearerAuth: [] }],
+        summary: 'Solicitar verificação de compliance (assíncrono)',
+        description: 'Registra uma solicitação de compliance e retorna imediatamente com `jobId` e status `PROCESSING`. O resultado é processado em background após 30 minutos e enviado via **webhook** para a `callbackUrl` informada no body.',
+        security: [{ apiKeyAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -113,8 +72,8 @@ const swaggerDocument = {
           },
         },
         responses: {
-          '200': {
-            description: 'Resultado da verificação de compliance',
+          '202': {
+            description: 'Solicitação aceita — resultado chegará via webhook',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/CheckComplianceResponse' },
@@ -122,7 +81,7 @@ const swaggerDocument = {
             },
           },
           '401': {
-            description: 'Token não fornecido ou inválido',
+            description: 'x-api-key ausente ou inválida',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' },
