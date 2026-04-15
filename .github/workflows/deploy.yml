@@ -36,6 +36,13 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Criar .env.test
+        run: |
+          echo 'DATABASE_URL="postgresql://postgres:postgres@localhost:5433/compliance_student_test?schema=public"' >> .env.test
+          echo 'NODE_ENV=test' >> .env.test
+          echo 'PORT=3001' >> .env.test
+          echo 'JWT_SECRET=test-secret-key-for-testing-only' >> .env.test
+
       - name: Gerar Prisma Client
         run: npx prisma generate
 
